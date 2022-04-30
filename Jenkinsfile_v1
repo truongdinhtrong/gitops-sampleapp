@@ -1,0 +1,75 @@
+pipeline {
+
+    agent any
+
+    environment {
+        REGISTRY                 = credentials('REGISTRY_NAME')
+        DOCKER_REGISTRY_PASSWORD = credentials('DOCKER_REGISTRY_PASSWORD')
+        DOCKER_REGISTRY_USER     = credentials('DOCKER_REGISTRY_USERNAME')
+        GITHUB_CREDS             = credentials('GITHUB_CREDS')
+    }
+    stages {
+        stage('Get COMMIT_ID') {
+            steps {
+                script {
+                    GIT_COMMIT = sh(returnStdout: true, script: "git log -n 1 --pretty=format:'%h'").trim()
+                }
+            }
+        }
+        stage('Docker Build') {
+            steps {
+                sh '''#!/bin/bash
+                docker login --username $DOCKER_REGISTRY_USER --password $DOCKER_REGISTRY_PASSWORD
+                docker build --tag ${REGISTRY}/sampleapp:${BRANCH}-${GIT_COMMIT} .
+                docker push ${REGISTRY}/sampleapp:${BRANCH}-${GIT_COMMIT}
+                '''
+            }
+        }
+        stage('Clone Helm Chart argo-cd') {
+            steps {
+              dir('argo-cd') {
+                  git branch: 'main', credentialsId: 'GITHUB_CREDS', 
+                  url: 'git@github.com:truongdinhtrong/argo-cd.git'
+                  sh '''#!/usr/bin/env bash
+                      git config --global user.email "truongdinhtrongctim@gmail.com"
+                      git config --global user.name "jenkins-ci"
+                  '''
+                 }
+            }
+        }
+        stage('Deploy Dev') {
+            when {
+                branch 'dev'
+            }
+            script {
+                 steps {
+                     sh '''#!/usr/bin/env bash
+                     echo "Shell Process ID: $$"
+                     # Replace Repository and tag
+                     cd ./argo-cd/sampleapp
+                     sed -r "s/^(\s*repository\s*:\s*).*/\1${REGISTRY}\/sampleapp/" -i values-dev.yaml
+                     sed -r "s/^(\s*tag\s*:\s*).*/\1${BRANCH}-${GIT_COMMIT}/" -i values-dev.yaml
+                     git commit -am 'Publish new version' && git push || echo 'no changes'
+                     '''
+                 }
+            }
+        }
+        stage('Deploy Prod') {
+            when {
+                branch 'prod'
+            }
+            script {
+                 steps {
+                     sh '''#!/usr/bin/env bash
+                     echo "Shell Process ID: $$"
+                     # Replace Repository and tag
+                     cd ./argo-cd/sampleapp
+                     sed -r "s/^(\s*repository\s*:\s*).*/\1${REGISTRY}\/sampleapp/" -i values-prod.yaml
+                     sed -r "s/^(\s*tag\s*:\s*).*/\1${BRANCH}-${GIT_COMMIT}/" -i values-prod.yaml
+                     git commit -am 'Publish new version' && git push || echo 'no changes'
+                     '''
+                 }
+            }
+        }
+    }
+}

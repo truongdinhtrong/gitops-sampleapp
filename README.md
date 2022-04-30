@@ -1,1 +1,1 @@
-# gitops-sampleapp
+# argocd-sampleapp for GitOps demonstration
