@@ -28,8 +28,7 @@ pipeline {
         stage('Clone Helm Chart argo-cd') {
             steps {
               dir('argo-cd') {
-                  git branch: 'main', credentialsId: 'GITHUB_CREDS', 
-                  url: 'git@github.com:truongdinhtrong/argo-cd.git'
+                  git branch: 'main', credentialsId: 'GITHUB_CREDS', url: 'git@github.com:truongdinhtrong/argo-cd.git'
                   sh '''#!/usr/bin/env bash
                       git config --global user.email "truongdinhtrongctim@gmail.com"
                       git config --global user.name "jenkins-ci"
